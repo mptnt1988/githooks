@@ -3,7 +3,8 @@
 %% API exports
 -export([write_info/1,
          write_info/2,
-         collect_data/0
+         collect_data/0,
+         get_os_session_id/0
         ]).
 
 %%==============================================================================
@@ -25,6 +26,9 @@ collect_data() ->
     #{
        current_branch => get_current_branch()
      }.
+
+get_os_session_id() ->
+    string:trim(os:cmd("ps -p " ++ os:getpid() ++ " --no-headers -o sid")).
 
 %%==============================================================================
 %% Internal functions

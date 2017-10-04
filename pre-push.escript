@@ -12,6 +12,11 @@ main([Remote, Url]) ->
         {ok, [LocalRef, LocalSHA, RemoteRef, RemoteSHA]} ->
 
             %%------------------------------------------------------------------
+            %% Get OS Session ID
+            io:format("OS Session ID: ~p~n", [[{?MODULE, ?LINE},
+                                               git:get_os_session_id()]]),
+
+            %%------------------------------------------------------------------
             %% Print all arguments
             io:format("All arguments: ~p~n",
                       [[{Remote, Url},
