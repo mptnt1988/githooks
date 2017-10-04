@@ -1,4 +1,7 @@
-.PHONY: init push
+.PHONY: build init push
+
+build:
+	@make build -C libs/erlang/git/
 
 init-%:
 	@support/init.sh $*
