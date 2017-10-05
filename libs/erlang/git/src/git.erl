@@ -5,7 +5,13 @@
          write_info/2,
          collect_data/0,
          get_os_pid/2,
-         start_node/4
+         node_start/4,
+         node_status/1,
+         node_stop/2,
+         call/4,
+         ipush/1,
+         ifetch/0,
+         start_intermediary/0
         ]).
 
 %%==============================================================================
@@ -31,27 +37,106 @@ collect_data() ->
 %% Relation: "ppid" | "pgid" | "sid"
 get_os_pid(Pid, Relation) ->
     Cmd = "ps -p " ++ Pid ++ " --no-headers -o " ++ Relation,
-    string:trim(os:cmd(Cmd)).
+    os_cmd(Cmd).
 
-start_node(ScriptPath, Name, Paths, Cmds) ->
+node_start(ScriptPath, Name, Paths, Cmds) ->
     StrOfPaths = "\"" ++ string_join(Paths) ++ "\"",
     StrOfCmds = "\"" ++ string_join(Cmds) ++ "\"",
     Cmd = string_join([ScriptPath, Name, StrOfPaths, StrOfCmds]),
-    string:trim(os:cmd(Cmd)).
+    os_cmd(Cmd).
+
+node_stop(ScriptPath, Name) ->
+    Cmd = string_join([ScriptPath, Name]),
+    os_cmd(Cmd).
+
+node_status(Name) ->
+    Cmd = "erl_call -sname " ++ Name ++ " -c " ++ Name,
+    Port = open_port({spawn, Cmd}, [exit_status]),
+    RecvFun =
+        fun Loop() ->
+                receive
+                    {Port, {data, _Any}} ->
+                        Loop();
+                    {Port, {exit_status, Status}} ->
+                        Status;
+                    E ->
+                        io:format("Node status got sth wrong: ~p~n", [E]),
+                        -1
+                end
+        end,
+    case RecvFun() of
+        0 -> started;
+        1 -> stopped;
+        _ -> wrong
+    end.
+
+call(NodeName, M, F, A) ->
+    setup_local_node(NodeName),
+    {ok, HostName} = inet:gethostname(),
+    RemoteNode = list_to_atom(NodeName ++ "@" ++ HostName),
+    rpc:call(RemoteNode, M, F, A).
+
+ipush(Data) ->
+    intermediary ! {self(), {push, Data}},
+    receive
+        Result ->
+            Result
+    after 500 ->
+            nok
+    end.
+
+ifetch() ->
+    intermediary ! {self(), fetch},
+    receive
+        Result ->
+            Result
+    after 500 ->
+            nok
+    end.
+
+start_intermediary() ->
+    Fun = fun() ->
+                  start_intermediary([])
+          end,
+    spawn_link(Fun).
+
+start_intermediary(Data) ->
+    register(intermediary, self()),
+    intermediary_loop(Data).
+
+intermediary_loop(Data) ->
+    receive
+        {Pid, {push, NewData}} ->
+            Pid ! ok,
+            intermediary_loop(NewData);
+        {Pid, fetch} ->
+            Pid ! {ok, Data},
+            intermediary_loop(Data);
+        _ ->
+            intermediary_loop(Data)
+    end.
 
 %%==============================================================================
 %% Internal functions
 %%==============================================================================
 
 get_current_branch() ->
-    run(["symbolic-ref", "--short", "HEAD"]).
+    gitrun(["symbolic-ref", "--short", "HEAD"]).
 
-run(WordList) ->
+gitrun(WordList) ->
     Cmd = string_join(["git"|WordList]),
-    string:trim(os:cmd(Cmd)).
+    os_cmd(Cmd).
 
 string_join(ListOfStrings) ->
     lists:flatten(lists:join(" ", ListOfStrings)).
+
+os_cmd(Cmd) ->
+    string:trim(os:cmd(Cmd)).
+
+setup_local_node(RemoteNodeName) ->
+    LocalNodeName = list_to_atom("escript_" ++ RemoteNodeName),
+    net_kernel:start([LocalNodeName, shortnames]),
+    erlang:set_cookie(node(), list_to_atom(RemoteNodeName)).
 
 %%==============================================================================
 %% Notes
