@@ -1,6 +1,8 @@
 #!/usr/bin/env escript
 
 -include_lib("kernel/include/file.hrl").
+-define(GITLIB_PATH, "libs/erlang/git/_build/default/lib/git/ebin").
+-define(STARTNODE_SCRIPT, "support/start-erl.sh")
 
 %%==============================================================================
 %% MAIN
@@ -13,8 +15,24 @@ main([Remote, Url]) ->
 
             %%------------------------------------------------------------------
             %% Get OS Session ID
-            io:format("OS Session ID: ~p~n", [[{?MODULE, ?LINE},
-                                               git:get_os_session_id()]]),
+            ScriptPID = os:getpid(),
+            SessionID = git:get_os_pid(ScriptPID, "sid"),
+            io:format("PID: ~p~n", [[{escript_pid, ScriptPID},
+                                     {session_id, SessionID}]]),
+
+            %%------------------------------------------------------------------
+            %% Start erl node
+            ScriptDir = get_script_dir(),
+            StartErlScript = filename:join(ScriptDir, ?STARTNODE_SCRIPT),
+            NodeName = "githooks_" ++ SessionPID,
+            CodePaths = [filename:join(get_script_dir(), ?GITLIB_PATH)],
+            Commands = [],
+            SER = git:start_node(StartErlScript, NodeName, CodePaths, Commands),
+            io:format("Start node cmd: ~p~n", [SER]),
+
+            %%------------------------------------------------------------------
+            %% Print current working directory
+            io:format("CWD: ~p~n", [file:get_cwd()]),
 
             %%------------------------------------------------------------------
             %% Print all arguments
@@ -28,7 +46,7 @@ main([Remote, Url]) ->
                           local_ref => LocalRef, local_sha => LocalSHA,
                           remote_ref => RemoteRef, remote_sha => RemoteSHA},
             Data = collect_git_data(BasicData),
-            io:format("Git: ~p~n", [[{?MODULE, ?LINE}, Data]]),
+            io:format("Git: ~p~n", [Data]),
             ok = git:write_info(Data),
 
             %%------------------------------------------------------------------
@@ -38,7 +56,7 @@ main([Remote, Url]) ->
                                   project => "gerrit/project-name"},
                                 [{verified, "+1"}, {codereview, "+2"}, submit],
                                 LocalSHA),
-            io:format("Gerrit: ~p~n", [[{?MODULE, ?LINE}, Res]]),
+            io:format("Gerrit: ~p~n", [Res]),
 
             %%------------------------------------------------------------------
             %% Test user interaction
@@ -86,9 +104,11 @@ get_script_path() ->
             ScriptPath
     end.
 
-add_lib_code_paths() ->
+get_script_dir() ->
     ScriptPath = get_script_path(),
-    ScriptDirName = filename:dirname(ScriptPath),
-    GitLibRelatedPath = "libs/erlang/git/_build/default/lib/git/ebin",
-    GitLibFullPath = filename:join(ScriptDirName, GitLibRelatedPath),
+    filename:dirname(ScriptPath).
+
+add_lib_code_paths() ->
+    ScriptDir = get_script_dir(),
+    GitLibFullPath = filename:join(ScriptDir, ?GITLIB_PATH),
     true = code:add_patha(GitLibFullPath).

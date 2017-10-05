@@ -4,7 +4,8 @@
 -export([write_info/1,
          write_info/2,
          collect_data/0,
-         get_os_session_id/0
+         get_os_pid/2,
+         start_node/4
         ]).
 
 %%==============================================================================
@@ -27,8 +28,16 @@ collect_data() ->
        current_branch => get_current_branch()
      }.
 
-get_os_session_id() ->
-    string:trim(os:cmd("ps -p " ++ os:getpid() ++ " --no-headers -o sid")).
+%% Relation: "ppid" | "pgid" | "sid"
+get_os_pid(Pid, Relation) ->
+    Cmd = "ps -p " ++ Pid ++ " --no-headers -o " ++ Relation,
+    string:trim(os:cmd(Cmd)).
+
+start_node(ScriptPath, Name, Paths, Cmds) ->
+    StrOfPaths = "\"" ++ string_join(Paths) ++ "\"",
+    StrOfCmds = "\"" ++ string_join(Cmds) ++ "\"",
+    Cmd = string_join([ScriptPath, Name, StrOfPaths, StrOfCmds]),
+    string:trim(os:cmd(Cmd)).
 
 %%==============================================================================
 %% Internal functions
@@ -38,8 +47,11 @@ get_current_branch() ->
     run(["symbolic-ref", "--short", "HEAD"]).
 
 run(WordList) ->
-    Cmd = lists:flatten(lists:join(" ", ["git"|WordList])),
+    Cmd = string_join(["git"|WordList]),
     string:trim(os:cmd(Cmd)).
+
+string_join(ListOfStrings) ->
+    lists:flatten(lists:join(" ", ListOfStrings)).
 
 %%==============================================================================
 %% Notes
