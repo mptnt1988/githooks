@@ -1,18 +1,27 @@
 -module(git).
 
 %% API exports
--export([write_info/1,
+-export([get_script_dir/0,
+         write_info/1,
          write_info/2,
          collect_data/0,
-         get_os_pid/2,
-         node_start/4,
-         node_status/1,
-         node_stop/2,
+         node_start/0,
+         node_status/0,
+         node_stop/0,
          call/4,
          ipush/1,
          ifetch/0,
-         start_intermediary/0
+         start_intermediary/0,
+         push_data/1,
+         fetch_data/0,
+         save_data/1,
+         load_data/0,
+         load_data/1
         ]).
+
+-define(STARTNODE_SCRIPT, "support/start-erl.sh").
+-define(STOPNODE_SCRIPT, "support/stop-erl.sh").
+-define(GITLIB_PATH, "libs/erlang/git/_build/default/lib/git/ebin").
 
 %%==============================================================================
 %% API functions
@@ -34,23 +43,35 @@ collect_data() ->
        current_branch => get_current_branch()
      }.
 
-%% Relation: "ppid" | "pgid" | "sid"
-get_os_pid(Pid, Relation) ->
-    Cmd = "ps -p " ++ Pid ++ " --no-headers -o " ++ Relation,
+node_start() ->
+    ScriptDir = get_script_dir(),
+    StartErlScript = filename:join(ScriptDir, ?STARTNODE_SCRIPT),
+    ScriptPID = os:getpid(),
+    SessionID = get_os_pid(ScriptPID, "sid"),
+    Name = "githooks_" ++ SessionID,
+    CodePaths = [filename:join(get_script_dir(), ?GITLIB_PATH)],
+    Commands = ["-s git start_intermediary"],
+    StrOfPaths = "\"" ++ string_join(CodePaths) ++ "\"",
+    StrOfCmds = "\"" ++ string_join(Commands) ++ "\"",
+    Cmd = string_join([StartErlScript, Name, StrOfPaths, StrOfCmds]),
     os_cmd(Cmd).
 
-node_start(ScriptPath, Name, Paths, Cmds) ->
-    StrOfPaths = "\"" ++ string_join(Paths) ++ "\"",
-    StrOfCmds = "\"" ++ string_join(Cmds) ++ "\"",
-    Cmd = string_join([ScriptPath, Name, StrOfPaths, StrOfCmds]),
+node_stop() ->
+    ScriptDir = get_script_dir(),
+    StopErlScript = filename:join(ScriptDir, ?STOPNODE_SCRIPT),
+    ScriptPID = os:getpid(),
+    SessionID = get_os_pid(ScriptPID, "sid"),
+    NodeName = "githooks_" ++ SessionID,
+
+    Cmd = string_join([StopErlScript, NodeName]),
     os_cmd(Cmd).
 
-node_stop(ScriptPath, Name) ->
-    Cmd = string_join([ScriptPath, Name]),
-    os_cmd(Cmd).
+node_status() ->
+    ScriptPID = os:getpid(),
+    SessionID = get_os_pid(ScriptPID, "sid"),
+    NodeName = "githooks_" ++ SessionID,
 
-node_status(Name) ->
-    Cmd = "erl_call -sname " ++ Name ++ " -c " ++ Name,
+    Cmd = "erl_call -sname " ++ NodeName ++ " -c " ++ NodeName,
     Port = open_port({spawn, Cmd}, [exit_status]),
     RecvFun =
         fun Loop() ->
@@ -69,6 +90,35 @@ node_status(Name) ->
         1 -> stopped;
         _ -> wrong
     end.
+
+push_data(Data) ->
+    ScriptPID = os:getpid(),
+    SessionID = get_os_pid(ScriptPID, "sid"),
+    NodeName = "githooks_" ++ SessionID,
+    git:call(NodeName, git, ipush, [Data]).
+
+save_data(Data) ->
+    node_start(),
+    push_data(Data).
+
+load_data() ->
+    load_data([exit]).
+
+load_data(Options) ->
+    {ok, FetchedData} = fetch_data(),
+    case lists:member(exit, Options) of
+        true ->
+            node_stop();
+        false ->
+            ok
+    end,
+    FetchedData.
+
+fetch_data() ->
+    ScriptPID = os:getpid(),
+    SessionID = get_os_pid(ScriptPID, "sid"),
+    NodeName = "githooks_" ++ SessionID,
+    git:call(NodeName, git, ifetch, []).
 
 call(NodeName, M, F, A) ->
     setup_local_node(NodeName),
@@ -120,6 +170,11 @@ intermediary_loop(Data) ->
 %% Internal functions
 %%==============================================================================
 
+%% Relation: "ppid" | "pgid" | "sid"
+get_os_pid(Pid, Relation) ->
+    Cmd = "ps -p " ++ Pid ++ " --no-headers -o " ++ Relation,
+    os_cmd(Cmd).
+
 get_current_branch() ->
     gitrun(["symbolic-ref", "--short", "HEAD"]).
 
@@ -137,6 +192,12 @@ setup_local_node(RemoteNodeName) ->
     LocalNodeName = list_to_atom("escript_" ++ RemoteNodeName),
     net_kernel:start([LocalNodeName, shortnames]),
     erlang:set_cookie(node(), list_to_atom(RemoteNodeName)).
+
+get_script_dir() ->
+    ExePath = escript:script_name(),
+    GetPathCmd = "readlink -f " ++ ExePath,
+    ScriptPath = string:trim(os:cmd(GetPathCmd)),
+    filename:dirname(ScriptPath).
 
 %%==============================================================================
 %% Notes
