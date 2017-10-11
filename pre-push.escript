@@ -60,7 +60,6 @@ main([Remote, Url]) ->
                                 end;
                             {'EXIT', Port, Reason} ->
                                 io:format("UI error: ~p~n", [Reason]),
-                                git:node_stop(),
                                 halt(1);
                             Unexpected ->
                                 io:format("UI unexpected: ~p~n", [Unexpected]),

@@ -1,19 +1,13 @@
 -module(git).
 
 %% API exports
--export([get_script_dir/0,
+-export([
          write_info/1,
          write_info/2,
          collect_data/0,
-         node_start/0,
-         node_status/0,
-         node_stop/0,
-         call/4,
          ipush/1,
          ifetch/0,
          start_intermediary/0,
-         push_data/1,
-         fetch_data/0,
          save_data/1,
          load_data/0,
          load_data/1
@@ -43,69 +37,19 @@ collect_data() ->
        current_branch => get_current_branch()
      }.
 
-node_start() ->
-    ScriptDir = get_script_dir(),
-    StartErlScript = filename:join(ScriptDir, ?STARTNODE_SCRIPT),
-    ScriptPID = os:getpid(),
-    SessionID = get_os_pid(ScriptPID, "sid"),
-    Name = "githooks_" ++ SessionID,
-    CodePaths = [filename:join(get_script_dir(), ?GITLIB_PATH)],
-    Commands = ["-s git start_intermediary"],
-    StrOfPaths = "\"" ++ string_join(CodePaths) ++ "\"",
-    StrOfCmds = "\"" ++ string_join(Commands) ++ "\"",
-    Cmd = string_join([StartErlScript, Name, StrOfPaths, StrOfCmds]),
-    os_cmd(Cmd).
-
-node_stop() ->
-    ScriptDir = get_script_dir(),
-    StopErlScript = filename:join(ScriptDir, ?STOPNODE_SCRIPT),
-    ScriptPID = os:getpid(),
-    SessionID = get_os_pid(ScriptPID, "sid"),
-    NodeName = "githooks_" ++ SessionID,
-
-    Cmd = string_join([StopErlScript, NodeName]),
-    os_cmd(Cmd).
-
-node_status() ->
-    ScriptPID = os:getpid(),
-    SessionID = get_os_pid(ScriptPID, "sid"),
-    NodeName = "githooks_" ++ SessionID,
-
-    Cmd = "erl_call -sname " ++ NodeName ++ " -c " ++ NodeName,
-    Port = open_port({spawn, Cmd}, [exit_status]),
-    RecvFun =
-        fun Loop() ->
-                receive
-                    {Port, {data, _Any}} ->
-                        Loop();
-                    {Port, {exit_status, Status}} ->
-                        Status;
-                    E ->
-                        io:format("Node status got sth wrong: ~p~n", [E]),
-                        -1
-                end
-        end,
-    case RecvFun() of
-        0 -> started;
-        1 -> stopped;
-        _ -> wrong
-    end.
-
-push_data(Data) ->
-    ScriptPID = os:getpid(),
-    SessionID = get_os_pid(ScriptPID, "sid"),
-    NodeName = "githooks_" ++ SessionID,
-    git:call(NodeName, git, ipush, [Data]).
-
+%% save_data = node_start + push_data
 save_data(Data) ->
     node_start(),
-    push_data(Data).
+    NodeName = get_node_name(),
+    call(NodeName, git, ipush, [Data]).
 
+%% load_data = fetch_data [ + node_stop]
 load_data() ->
     load_data([exit]).
 
 load_data(Options) ->
-    {ok, FetchedData} = fetch_data(),
+    NodeName = get_node_name(),
+    {ok, FetchedData} = call(NodeName, git, ifetch, []),
     case lists:member(exit, Options) of
         true ->
             node_stop();
@@ -113,18 +57,6 @@ load_data(Options) ->
             ok
     end,
     FetchedData.
-
-fetch_data() ->
-    ScriptPID = os:getpid(),
-    SessionID = get_os_pid(ScriptPID, "sid"),
-    NodeName = "githooks_" ++ SessionID,
-    git:call(NodeName, git, ifetch, []).
-
-call(NodeName, M, F, A) ->
-    setup_local_node(NodeName),
-    {ok, HostName} = inet:gethostname(),
-    RemoteNode = list_to_atom(NodeName ++ "@" ++ HostName),
-    rpc:call(RemoteNode, M, F, A).
 
 ipush(Data) ->
     intermediary ! {self(), {push, Data}},
@@ -170,6 +102,60 @@ intermediary_loop(Data) ->
 %% Internal functions
 %%==============================================================================
 
+call(NodeName, M, F, A) ->
+    setup_local_node(NodeName),
+    {ok, HostName} = inet:gethostname(),
+    RemoteNode = list_to_atom(NodeName ++ "@" ++ HostName),
+    rpc:call(RemoteNode, M, F, A).
+
+node_start() ->
+    %% StartErlScript
+    ScriptDir = get_script_dir(),
+    StartErlScript = filename:join(ScriptDir, ?STARTNODE_SCRIPT),
+    %% NodeName
+    NodeName = get_node_name(),
+    %% StrOfPaths
+    CodePaths = [filename:join(get_script_dir(), ?GITLIB_PATH)],
+    StrOfPaths = "\"" ++ string_join(CodePaths) ++ "\"",
+    %% StrOfCmds
+    Commands = ["-s git start_intermediary"],
+    StrOfCmds = "\"" ++ string_join(Commands) ++ "\"",
+
+    Cmd = string_join([StartErlScript, NodeName, StrOfPaths, StrOfCmds]),
+    os_cmd(Cmd).
+
+node_stop() ->
+    %% StopErlScript
+    ScriptDir = get_script_dir(),
+    StopErlScript = filename:join(ScriptDir, ?STOPNODE_SCRIPT),
+    %% NodeName
+    NodeName = get_node_name(),
+
+    Cmd = string_join([StopErlScript, NodeName]),
+    os_cmd(Cmd).
+
+%% node_status() ->
+%%     NodeName = get_node_name(),
+%%     Cmd = "erl_call -sname " ++ NodeName ++ " -c " ++ NodeName,
+%%     Port = open_port({spawn, Cmd}, [exit_status]),
+%%     RecvFun =
+%%         fun Loop() ->
+%%                 receive
+%%                     {Port, {data, _Any}} ->
+%%                         Loop();
+%%                     {Port, {exit_status, Status}} ->
+%%                         Status;
+%%                     E ->
+%%                         io:format("Node status got sth wrong: ~p~n", [E]),
+%%                         -1
+%%                 end
+%%         end,
+%%     case RecvFun() of
+%%         0 -> started;
+%%         1 -> stopped;
+%%         _ -> wrong
+%%     end.
+
 %% Relation: "ppid" | "pgid" | "sid"
 get_os_pid(Pid, Relation) ->
     Cmd = "ps -p " ++ Pid ++ " --no-headers -o " ++ Relation,
@@ -198,6 +184,11 @@ get_script_dir() ->
     GetPathCmd = "readlink -f " ++ ExePath,
     ScriptPath = string:trim(os:cmd(GetPathCmd)),
     filename:dirname(ScriptPath).
+
+get_node_name() ->
+    ScriptPID = os:getpid(),
+    SessionID = get_os_pid(ScriptPID, "sid"),
+    "githooks_" ++ SessionID.
 
 %%==============================================================================
 %% Notes
