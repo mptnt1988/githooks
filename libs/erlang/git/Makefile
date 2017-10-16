@@ -7,7 +7,7 @@ clean:
 	@rebar3 clean --all
 
 rel:
-	@rebar3 rel
+	@rebar3 release
 
 clear-rel:
 	@rm -rf _build/default/rel/

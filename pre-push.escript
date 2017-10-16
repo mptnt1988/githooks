@@ -37,6 +37,7 @@ main([Remote, Url]) ->
                           remote_ref => RemoteRef, remote_sha => RemoteSHA},
             MoreGitData = git:collect_data(),
             Data = maps:merge(BasicData, MoreGitData),
+            io:format("Data is to be saved...~n"),
             ok = git:save_data(Data),
             io:format("Save data to node successfully.~n"),
 
@@ -105,9 +106,9 @@ main([Remote, Url]) ->
 %%==============================================================================
 
 %%------------------------------------------------------------------------------
-%% This script may be symlinked, then escript:script_name() returns path to the
-%% symlink. Get regular file path and dir of the script, then add dir of git lib
-%% module to code paths.
+%% When being symlinked, escript:script_name() returns path to the symlink.
+%% Get regular file path and dir of the script, then add dir of git lib module
+%% to code paths.
 %%------------------------------------------------------------------------------
 add_lib_code_paths() ->
     ExePath = escript:script_name(),

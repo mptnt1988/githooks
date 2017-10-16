@@ -1,16 +1,17 @@
 {application, git,
- [{description, "An OTP library"},
+ [{description, "Interface to git erlang packages."},
   {vsn, "0.1.0"},
   {registered, []},
   {applications,
    [kernel,
     stdlib,
-    mpgit
+    mpgit,
+    lager
    ]},
   {env,[]},
   {modules, []},
 
-  {maintainers, []},
+  {maintainers, ["Tuan Tran"]},
   {licenses, ["Apache 2.0"]},
   {links, []}
  ]}.
