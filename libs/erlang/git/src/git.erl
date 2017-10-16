@@ -1,7 +1,7 @@
 -module(git).
 
 %% API exports
--export([
+-export([load/0,
          write_info/1,
          write_info/2,
          collect_data/0,
@@ -16,10 +16,14 @@
 -define(STARTNODE_SCRIPT, "support/start-erl.sh").
 -define(STOPNODE_SCRIPT, "support/stop-erl.sh").
 -define(GITLIB_PATH, "libs/erlang/git/_build/default/lib/git/ebin").
+-define(DEPS_PATHS, ["libs/erlang/git/_build/default/lib/mpgit/ebin"
+                    ]).
 
 %%==============================================================================
 %% API functions
 %%==============================================================================
+load() ->
+    [true = code:add_path(Path) || Path <- ?DEPS_PATHS].
 
 write_info(Data) when is_map(Data) ->
     {{Y, M, D}, {H, Ms, S}} = erlang:localtime(),
@@ -34,7 +38,7 @@ write_info(Data, OutFile) when is_map(Data), is_list(OutFile) ->
 
 collect_data() ->
     #{
-       current_branch => get_current_branch()
+       current_branch => mpgit:get_current_branch()
      }.
 
 %% save_data = node_start + push_data

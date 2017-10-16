@@ -116,4 +116,5 @@ add_lib_code_paths() ->
     ScriptDir = filename:dirname(ScriptPath),
     GitLibPath = "libs/erlang/git/_build/default/lib/git/ebin",
     GitLibFullPath = filename:join(ScriptDir, GitLibPath),
-    true = code:add_patha(GitLibFullPath).
+    true = code:add_path(GitLibFullPath),
+    git:load().

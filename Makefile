@@ -8,6 +8,12 @@ __defined_check = \
 build:
 	@make build -C libs/erlang/git/
 
+rel:
+	@make rel -C libs/erlang/git/
+
+clear-rel:
+	@make clear-rel -C libs/erlang/git/
+
 # For using
 create:
 	$(call defined_check, REPO, which repository to add the hook)
