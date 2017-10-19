@@ -1,0 +1,9 @@
+:name "githooks"
+:node-sname "githooks"
+:lib-dirs '(".")
+:start-command "erl -sname githooks -pa \
+git/_build/default/lib/git/ebin \
+git/_build/default/lib/mpgit/ebin \
+git/_build/default/lib/lager/ebin \
+git/_build/default/lib/goldrush/ebin \
+"
