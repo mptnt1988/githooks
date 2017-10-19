@@ -1,13 +1,15 @@
-.PHONY: build clean
+.PHONY: all build clean release clear-release
 
-build: clean
+all: clean clear-release build release
+
+build:
 	@rebar3 compile
 
 clean:
 	@rebar3 clean --all
 
-rel:
+release:
 	@rebar3 release
 
-clear-rel:
+clear-release:
 	@rm -rf _build/default/rel/

@@ -1,18 +1,15 @@
-.PHONY: build init push
+.PHONY: all create push pushq
 
 defined_check = \
     $(strip $(foreach 1,$1,$(call __defined_check,$1,$(strip $(value 2)))))
 __defined_check = \
     $(if $(value $1),,$(error Undefined $1$(if $2, ($2))))
 
-build:
-	@make build -C libs/erlang/git/
+all: ;
 
-rel:
-	@make rel -C libs/erlang/git/
-
-clear-rel:
-	@make clear-rel -C libs/erlang/git/
+# For escript: erl-all, erl-build, erl-clean, erl-release, erl-clear-release
+erl-%:
+	@make $* -C libs/erlang/git
 
 # For using
 create:
