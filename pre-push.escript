@@ -84,7 +84,7 @@ main([Remote, Url]) ->
                                    {codereview, "+2"},
                                    submit],
                         Pid ! {self(),
-                               gerrit:review(Settings, Actions, LocalSHA)}
+                               git:gerrit_review(Settings, Actions, LocalSHA)}
                 end,
             process_flag(trap_exit, true),
             GerritPid = spawn_link(GerritFun),

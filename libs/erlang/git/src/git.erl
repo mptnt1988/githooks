@@ -2,6 +2,7 @@
 
 %% API exports
 -export([load/0,
+         gerrit_review/3,
          write_info/1,
          write_info/2,
          collect_data/0,
@@ -30,6 +31,9 @@
 load() ->
     [true = code:add_path(get_full_path(Path)) || Path <- ?DEPS_PATHS].
 
+gerrit_review(ConfigMap, Actions, CommitID) ->
+    mpgit:gerrit_review(ConfigMap, Actions, CommitID).
+
 write_info(Data) when is_map(Data) ->
     {{Y, M, D}, {H, Ms, S}} = erlang:localtime(),
     TimeStampFormat = "~4w~.2.0w~.2.0w~.2.0w~.2.0w~.2.0w",
@@ -56,7 +60,6 @@ save_data(Data) ->
                 _ -> Loop(N-1)
             end
     end(10),
-    timer:sleep(5000),
     NodeName = get_node_name(),
     call(NodeName, git, ipush, [Data]).
 
