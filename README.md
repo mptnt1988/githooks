@@ -19,16 +19,21 @@ NOTE: 'test' directory is git-ignored by default.
 
 Currently, only Erlang and Python are supported.
 ### INIT ###
+Create 'test' directory mentioned above with Erlang (escript) or Python (py):
   ```bash
   make init-escript
   make init-py
   ```
-### pre-push ###
+With Erlang, support library needs to be built:
+  ```bash
+  make erl-all
+  ```  
+### PRE-PUSH ###
 For pre-push test:
   ```bash
   make push
   ```
-### post-push ###
+### POST-PUSH ###
 There is no git native support for post-push, and this is just a workaround.
 
 git-push will be wrapped in git-pushq and post-push script is invoked after git-push completes successfully.
